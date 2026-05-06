@@ -1,13 +1,14 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 PaymentType = Literal["daily", "weekly", "monthly", "yearly"]
 FinanceScope = Literal["daily", "weekly", "monthly", "yearly"]
 InstallmentStatus = Literal["paid", "partial", "skipped", "pending"]
 PaymentMode = Literal["phonepe", "gpay", "cash"]
+InterestType = Literal["percentage", "rupees_100", "rupees", "daily_rupees"]
 
 
 class VillageCreate(BaseModel):
@@ -37,10 +38,21 @@ class CustomerCreate(BaseModel):
     payment_type: PaymentType
     installment_amount: float = Field(gt=0)
     installment_count: int = Field(gt=0)
-    phone_number: str = Field(min_length=8)
+    phone_number: str = Field(pattern=r"^\d{10}$")
     image_url: str | None = None
-    aadhar_number: str = Field(min_length=6)
+    aadhar_number: str = Field(pattern=r"^\d{12}$")
     aadhar_image_url: str | None = None
+    interest_type: InterestType | None = None
+    interest_value: float = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_loan_amount_vs_installments(self) -> "CustomerCreate":
+        total_installments = float(self.installment_amount) * int(self.installment_count)
+        if total_installments < float(self.amount_lent):
+            raise ValueError("Total installments must be greater than or equal to loan amount.")
+        if self.interest_value > 0 and self.interest_type is None:
+            raise ValueError("Interest type is required when interest value is greater than 0.")
+        return self
 
 
 class CustomerUpdate(CustomerCreate):
@@ -62,6 +74,8 @@ class CustomerPublic(BaseModel):
     aadhar_number: str
     aadhar_image_url: str | None = None
     external_customer_id: str
+    interest_type: InterestType | None = None
+    interest_value: float = 0
     overdue_installments: int = 0
     overdue_amount: float = 0
     due_this_month_installments: int = 0
@@ -79,6 +93,33 @@ class CollectionRecordCreate(BaseModel):
     amount_paid: float = Field(gt=0)
     payment_mode: PaymentMode
     note: str | None = Field(default=None, max_length=240)
+    late_interest_base_amount: float = Field(default=0, ge=0)
+    late_interest_type: InterestType | None = None
+    late_interest_value: float = Field(default=0, ge=0)
+    late_interest_from: date | None = None
+    late_interest_to: date | None = None
+    late_interest_collected_amount: float | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_late_interest(self) -> "CollectionRecordCreate":
+        has_interest_input = (
+            self.late_interest_base_amount > 0
+            or self.late_interest_value > 0
+            or self.late_interest_from is not None
+            or self.late_interest_to is not None
+        )
+        if has_interest_input:
+            if self.late_interest_type is None:
+                raise ValueError("Late interest type is required.")
+            if self.late_interest_value <= 0:
+                raise ValueError("Late interest value must be greater than 0.")
+            if self.late_interest_base_amount <= 0:
+                raise ValueError("Late interest base amount must be greater than 0.")
+            if self.late_interest_from is None or self.late_interest_to is None:
+                raise ValueError("Late interest from and to dates are required.")
+            if self.late_interest_from > self.late_interest_to:
+                raise ValueError("Late interest from date must be on or before to date.")
+        return self
 
 
 class CollectionRecordPublic(BaseModel):
@@ -98,6 +139,14 @@ class CollectionRecordPublic(BaseModel):
     collected_at: datetime
     status_after_payment: InstallmentStatus
     note: str | None = None
+    late_interest_base_amount: float = 0
+    late_interest_type: InterestType | None = None
+    late_interest_value: float = 0
+    late_interest_from: date | None = None
+    late_interest_to: date | None = None
+    late_interest_days: int = 0
+    late_interest_amount: float = 0
+    late_interest_collected_amount: float = 0
 
 
 class DelayedCustomerPublic(BaseModel):
@@ -124,6 +173,9 @@ class InstallmentCalendarEntry(BaseModel):
     last_collected_by_name: str | None = None
     latest_payment_event_amount: float | None = None
     latest_payment_cover_count: int | None = None
+    principal_due: float | None = None
+    interest_added: float = 0
+    last_interest_applied_date: date | None = None
 
 
 class CustomerDetailResponse(BaseModel):
@@ -157,7 +209,29 @@ class CollectionTransactionRow(BaseModel):
     customer_full_name: str
     village_id: str
     village_name: str
+    finance_scope: FinanceScope = "weekly"
+    village_day: str | None = None
     note: str | None = None
+
+
+class CollectionsReportFacetVillage(BaseModel):
+    id: str
+    name: str
+
+
+class CollectionsReportFacetCustomer(BaseModel):
+    id: str
+    full_name: str
+    village_id: str
+
+
+class CollectionsReportFacets(BaseModel):
+    """Filter choices derived from collection activity in the selected date range."""
+
+    finance_scopes: list[FinanceScope]
+    villages: list[CollectionsReportFacetVillage]
+    customers: list[CollectionsReportFacetCustomer]
+    payment_modes: list[PaymentMode]
 
 
 class CollectionsReportResponse(BaseModel):
@@ -165,6 +239,7 @@ class CollectionsReportResponse(BaseModel):
     transaction_count: int
     series: list[CollectionTimeseriesPoint]
     transactions: list[CollectionTransactionRow]
+    facets: CollectionsReportFacets
 
 
 class InstallmentInDB(BaseModel):
@@ -178,6 +253,9 @@ class InstallmentInDB(BaseModel):
     amount_due: float
     amount_paid: float = 0
     status: InstallmentStatus = "pending"
+    principal_due: float | None = None
+    interest_added: float = 0
+    last_interest_applied_date: date | None = None
 
 
 class CollectionRecordInDB(BaseModel):
@@ -228,6 +306,9 @@ class CustomerInDB(BaseModel):
     image_url: str | None = None
     aadhar_number: str
     aadhar_image_url: str | None = None
+    interest_type: InterestType | None = None
+    interest_value: float = 0
     external_customer_id: str
     created_at: datetime
     updated_at: datetime
+

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pymongo.collection import Collection
 from uuid import uuid4
 
-from app.api.deps import get_customer_collection, get_user_collection, get_village_collection
+from app.api.deps import get_customer_collection, get_user_collection
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.access_profile import build_user_public
 from app.models.user import AuthResponse, RegisterRequest, UserInDB
@@ -23,7 +23,6 @@ def list_admins(collection: Collection = Depends(get_user_collection)) -> list[d
 def register(
     payload: RegisterRequest,
     collection: Collection = Depends(get_user_collection),
-    village_collection: Collection = Depends(get_village_collection),
     customer_collection: Collection = Depends(get_customer_collection),
 ) -> AuthResponse:
     email = payload.email.strip().lower()
@@ -77,17 +76,6 @@ def register(
         "session_id": new_session_id,
     }
     collection.insert_one(user_document)
-
-    village_collection.insert_one(
-        {
-            "_id": f"vil-{payload.user_id.strip().lower()}",
-            "owner_user_id": payload.user_id.strip(),
-            "name": "Default Village",
-            "day": "Monday",
-            "created_at": __import__("datetime").datetime.now(__import__("datetime").UTC),
-            "updated_at": __import__("datetime").datetime.now(__import__("datetime").UTC),
-        }
-    )
 
     access_token = create_access_token(user_document["_id"], new_session_id)
     inserted = collection.find_one({"_id": user_document["_id"]})

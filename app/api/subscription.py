@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -8,9 +8,11 @@ from pymongo.collection import Collection
 from app.api.deps import get_current_user, get_customer_collection, get_user_collection
 from app.core.access_profile import build_user_public
 from app.core.subscription_catalog import public_plans_catalog
+from app.core.timezone import get_ist_timezone
 from app.models.user import UserInDB, UserPublic
 
 router = APIRouter(prefix="/subscription", tags=["subscription"])
+IST = get_ist_timezone()
 
 
 class SelectPlanRequest(BaseModel):
@@ -49,7 +51,7 @@ def select_plan(
             detail="Only the business admin can change the subscription plan.",
         )
 
-    now = datetime.now(UTC)
+    now = datetime.now(IST)
     if payload.tier == "free":
         expires_at: datetime | None = None
     elif payload.billing_period == "monthly":

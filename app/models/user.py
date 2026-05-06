@@ -68,6 +68,15 @@ class DashboardDailyCard(BaseModel):
     tone: Literal["positive", "negative", "neutral"]
 
 
+class DashboardFinanceBookPerformance(BaseModel):
+    scope: Literal["daily", "weekly", "monthly", "yearly"]
+    label: str
+    invested: str
+    returns: str
+    profit_or_loss: str
+    tone: Literal["positive", "negative", "neutral"]
+
+
 class DashboardResponse(BaseModel):
     message: str
     user_id: str
@@ -80,6 +89,7 @@ class DashboardResponse(BaseModel):
     subscription_expires_at: Optional[datetime] = None
     summary: list[DashboardSummaryMetric]
     daily_cards: list[DashboardDailyCard]
+    finance_book_performance: list[DashboardFinanceBookPerformance] = []
     attention_required_count: int = 0
     overdue_amount: str = "₹0"
     delayed_customers: list[DelayedCustomerPublic] = []
