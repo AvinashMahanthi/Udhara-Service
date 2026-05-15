@@ -12,6 +12,7 @@ from app.api.deps import (
     get_installment_collection,
     get_village_collection,
 )
+from app.core.access_profile import subscription_is_active
 from app.core.finance_scope import villages_mongo_filter
 from app.core.timezone import get_ist_timezone
 from app.models.finance import (
@@ -697,11 +698,11 @@ def create_customer(
     if village is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Village not found")
 
-    if current_user.subscription_tier == "pending":
+    if not subscription_is_active(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
-                "message": "Choose a plan before adding customers.",
+                "message": "An active subscription is required to add customers.",
                 "code": "SUBSCRIPTION_REQUIRED",
             },
         )

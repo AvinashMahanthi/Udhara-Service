@@ -21,11 +21,25 @@ TIER_CUSTOMER_LIMIT: dict[str, int] = {
 
 # Monthly list prices (INR).
 PAID_MONTHLY_INR: dict[PaidTier, int] = {
-    "basic": 99,
+    "basic": 199,
     "pro": 299,
     "elite": 399,
     "unlimited": 499,
 }
+
+# Payment gateway charges passed on to the subscriber.
+PLATFORM_FEE_PERCENT: float = 2.15   # % of base price
+GST_PERCENT: float = 18.0            # % of base price (Indian GST on subscription)
+
+
+def total_charge_paise(base_inr: int) -> int:
+    """
+    Base price + 2.15% platform fee + 18% GST, both applied on the base price.
+    Total extra = 2.15 + 18 = 20.15% of base.
+    This is the exact amount sent to Razorpay and verified on payment confirmation.
+    """
+    total = base_inr * (1 + (PLATFORM_FEE_PERCENT + GST_PERCENT) / 100)
+    return round(total * 100)
 
 
 def customer_limit_for_tier(tier: str) -> int:

@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(default=120, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     api_port: int = Field(default=8080, alias="API_PORT")
+    razorpay_key_id: str = Field(alias="RAZORPAY_KEY_ID")
+    razorpay_key_secret: str = Field(alias="RAZORPAY_KEY_SECRET")
     # cors_origins: str = Field(default="http://localhost:8081,http://localhost:19006,http://localhost:3000", alias="CORS_ORIGINS")
 
     # @property

@@ -2,12 +2,30 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from pymongo.collection import Collection
 
 from app.core.subscription_catalog import customer_limit_for_tier
 from app.models.user import UserInDB, UserPublic
+
+
+def _subscription_is_expired(user: UserInDB) -> bool:
+    """Paid tiers expire; free tier never does."""
+    if user.subscription_tier in ("pending", "free"):
+        return False
+    if user.subscription_expires_at is None:
+        return False
+    exp = user.subscription_expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    return exp < datetime.now(timezone.utc)
+
+
+def subscription_is_active(user: UserInDB) -> bool:
+    """True if the user has a non-pending, non-expired subscription."""
+    return user.subscription_tier != "pending" and not _subscription_is_expired(user)
 
 
 def _owner_id_for_subscription(user: UserInDB) -> str:
@@ -61,7 +79,7 @@ def build_user_public(user: UserInDB, users_coll: Collection, customers_coll: Co
     owner_id = _owner_id_for_subscription(user)
     used = count_customers_for_owner(customers_coll, owner_id)
     limit = customer_limit_for_tier(sub_user.subscription_tier)
-    has_access = sub_user.subscription_tier != "pending"
+    has_access = sub_user.subscription_tier != "pending" and not _subscription_is_expired(sub_user)
 
     return UserPublic(
         id=user.id,

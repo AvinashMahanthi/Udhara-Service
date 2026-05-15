@@ -6,3 +6,4 @@ pwdlib[argon2]==0.2.1
 pydantic-settings==2.10.1
 email-validator==2.2.0
 python-dotenv==1.1.1
+razorpay==2.0.1
