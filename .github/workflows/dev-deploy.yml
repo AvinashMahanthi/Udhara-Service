@@ -25,11 +25,10 @@ jobs:
           script: |
             set -e
 
-            echo "Starting deployment..."
+            echo "Switching to root shell..."
+            sudo -i bash << 'EOF'
 
-            sudo -i
-
-            cd Udhara-Service
+            cd /root/Udhara-Service
 
             echo "Fetching latest code..."
             git fetch origin
