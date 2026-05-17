@@ -27,7 +27,9 @@ jobs:
 
             echo "Starting deployment..."
 
-            cd /root/Udhara-Service
+            sudo -i
+
+            cd Udhara-Service
 
             echo "Fetching latest code..."
             git fetch origin
