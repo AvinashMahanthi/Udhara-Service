@@ -1,0 +1,53 @@
+name: Dev Server Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to deploy"
+        required: true
+        default: "main"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy Selected Branch
+        uses: appleboy/ssh-action@master
+
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          port: 22
+
+          script: |
+            set -e
+
+            echo "Starting deployment..."
+
+            cd /root/Udhara-Service
+
+            echo "Fetching latest code..."
+            git fetch origin
+
+            echo "Checking out selected branch..."
+            git checkout ${{ github.event.inputs.branch }}
+
+            echo "Pulling latest code..."
+            git pull origin ${{ github.event.inputs.branch }}
+
+            echo "Activating virtual environment..."
+            source venv/bin/activate
+
+            echo "Installing dependencies..."
+            pip install -r requirements.txt
+
+            echo "Restarting backend service..."
+            sudo systemctl restart backend.service
+
+            echo "Checking backend service status..."
+            sudo systemctl status backend.service --no-pager
+
+            echo "Deployment completed successfully!"
